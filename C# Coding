@@ -1,0 +1,74 @@
+using System.Net.Http;
+using Newtonsoft.Json.Linq;  // Add this for parsing JSON
+using System.Threading.Tasks;
+
+namespace CurrencyConvertorApp
+{
+    public partial class MainPage : ContentPage
+    {
+        public MainPage()
+        {
+            InitializeComponent();
+            LoadCurrencies();  // Load currencies when the page is opened
+        }
+
+        // Load currencies into the pickers
+        private void LoadCurrencies()
+        {
+            var currencies = new List<string> { "USD", "EUR", "GBP", "JPY", "CAD", "AUD", "INR", "AED" };
+            FromCurrencyPicker.ItemsSource = currencies;
+            ToCurrencyPicker.ItemsSource = currencies;
+        }
+
+        // Method to fetch exchange rates from the API
+        public async Task<double> GetExchangeRate(string fromCurrency, string toCurrency)
+        {
+            string apiKey = "ad4a5a6cb4fcaa3a48d76c38";  // Replace with your Exchange Rate API key
+            string url = $"https://v6.exchangerate-api.com/v6/{apiKey}/latest/{fromCurrency}";
+
+            using HttpClient client = new HttpClient();
+            var response = await client.GetStringAsync(url);
+
+            var json = JObject.Parse(response);
+            var exchangeRateToken = json["conversion_rates"]?[toCurrency];
+
+            if (exchangeRateToken != null)
+            {
+                double exchangeRate = exchangeRateToken.Value<double>();
+                return exchangeRate;
+            }
+            else
+            {
+                throw new Exception("Could not retrieve exchange rate");
+            }
+        }
+
+        // Button click handler for currency conversion
+        private async void OnConvertClicked(object sender, EventArgs e)
+        {
+            if (double.TryParse(AmountEntry.Text, out double amount) &&
+                FromCurrencyPicker.SelectedItem is not null &&
+                ToCurrencyPicker.SelectedItem is not null)
+            {
+                string fromCurrency = FromCurrencyPicker.SelectedItem.ToString() ?? "USD"; // default to USD if null
+                string toCurrency = ToCurrencyPicker.SelectedItem.ToString() ?? "USD"; // default to USD if null
+
+                try
+                {
+                    double exchangeRate = await GetExchangeRate(fromCurrency, toCurrency);
+                    double convertedAmount = amount * exchangeRate;
+
+                    ResultLabel.Text = $"Converted Amount: {convertedAmount:0.00} {toCurrency}";
+                }
+                catch (Exception ex)
+                {
+                    await DisplayAlert("Error", $"Failed to convert currency: {ex.Message}", "OK");
+                }
+            }
+            else
+            {
+                await DisplayAlert("Error", "Please enter a valid amount and select both currencies.", "OK");
+            }
+        }
+    }
+}
